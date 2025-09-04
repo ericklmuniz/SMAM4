@@ -10,31 +10,41 @@ public class QueueSystem {
     double lastTime = 0;
     double currentTime = 0;
     double serviceMin, serviceMax;
-    Random random;
+    // Random random;
     QueueSystem nextQueue = null;
+    CountingRandom countingRandom;
 
-    public QueueSystem(int servers, int capacity, double serviceMin, double serviceMax, Random random) {
+    public QueueSystem(int servers, int capacity, double serviceMin, double serviceMax, CountingRandom countingRandom) {
         this.servers = servers;
         this.capacity = capacity;
         this.stateTimes = new double[capacity + 1];
         this.serviceMin = serviceMin;
         this.serviceMax = serviceMax;
-        this.random = random;
+        // this.random = random;
+        this.countingRandom = countingRandom;
     }
 
     public void setNextQueue(QueueSystem nextQueue) {
         this.nextQueue = nextQueue;
     }
 
+    private int currentState() {
+        int inService = busyServers.size();
+        int inQueue = waitingLine.size();
+        int state = inService + inQueue;
+        if (state > capacity) state = capacity;
+        return state;
+    }
+
     public void updateState(double timeNow) {
-        int state = waitingLine.size();
+        int state = currentState();
         stateTimes[state] += timeNow - lastTime;
         lastTime = timeNow;
         this.currentTime = timeNow;
     }
 
     public boolean canAccept() {
-        return waitingLine.size() + busyServers.size() < capacity;
+        return (waitingLine.size() + busyServers.size()) < capacity;
     }
 
     public void addCustomer(Customer customer, double timeNow, PriorityQueue<Event> scheduler) {
@@ -46,10 +56,14 @@ public class QueueSystem {
         }
 
         if (busyServers.size() < servers) {
-            double duration = serviceMin + (serviceMax - serviceMin) * random.nextDouble();
-            double endService = timeNow + duration;
-            busyServers.add(endService);
-            scheduler.add(new Event(endService, EventType.DEPARTURE, this, customer));
+            if (countingRandom.canDraw()) {
+                double duration = serviceMin + (serviceMax - serviceMin) * countingRandom.nextDouble();
+                double endService = timeNow + duration;
+                busyServers.add(endService);
+                scheduler.add(new Event(endService, EventType.DEPARTURE, this, customer));
+            } else {
+                waitingLine.add(customer);
+            }
         } else {
             waitingLine.add(customer);
         }
@@ -61,18 +75,28 @@ public class QueueSystem {
 
         if (!waitingLine.isEmpty()) {
             Customer next = waitingLine.poll();
-            double duration = serviceMin + (serviceMax - serviceMin) * random.nextDouble();
-            double endService = timeNow + duration;
-            busyServers.add(endService);
-            scheduler.add(new Event(endService, EventType.DEPARTURE, this, next));
+            if (countingRandom.canDraw()) {
+                double duration = serviceMin + (serviceMax - serviceMin) * countingRandom.nextDouble();
+                double endService = timeNow + duration;
+                busyServers.add(endService);
+                scheduler.add(new Event(endService, EventType.DEPARTURE, this, next));
+            } else {
+                waitingLine.add(next);
+            }
         }
     }
 
-    public void printStats() {
+    public void printStats(double currentTime) {
         System.out.println("Clientes perdidos: " + lostCustomers);
+        System.out.println("Tempos acumulados por estado:");
+        for (int i = 0; i < stateTimes.length; i++) {
+            System.out.printf("Estado %d: %.6f\n", i, stateTimes[i]);
+        }
+
         System.out.println("Distribuição de estados:");
         for (int i = 0; i < stateTimes.length; i++) {
-            System.out.printf("Estado %d: %.4f\n", i, stateTimes[i] / currentTime);
+            double p = (currentTime > 0.0) ? (stateTimes[i] / currentTime) : 0.0;
+            System.out.printf("Estado %d: %.6f\n", i, p);
         }
     }
 }
