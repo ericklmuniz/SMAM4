@@ -1,6 +1,8 @@
 import java.util.*;
 
 public class QueueSystem {
+    int id;
+    String name;
     int servers;
     int capacity;
     Queue<Customer> waitingLine = new LinkedList<>();
@@ -10,29 +12,42 @@ public class QueueSystem {
     double lastTime = 0;
     double currentTime = 0;
     double serviceMin, serviceMax;
-    // Random random;
-    QueueSystem nextQueue = null;
+    List<RoutingRule> routingRules;
+    Map<Integer, QueueSystem> stationMap;
     CountingRandom countingRandom;
 
-    public QueueSystem(int servers, int capacity, double serviceMin, double serviceMax, CountingRandom countingRandom) {
+    public QueueSystem(int id, String name, int servers, int capacity, double serviceMin, double serviceMax, 
+                      List<RoutingRule> routingRules, CountingRandom countingRandom) {
+        this.id = id;
+        this.name = name;
         this.servers = servers;
         this.capacity = capacity;
-        this.stateTimes = new double[capacity + 1];
         this.serviceMin = serviceMin;
         this.serviceMax = serviceMax;
-        // this.random = random;
+        this.routingRules = routingRules;
         this.countingRandom = countingRandom;
+        
+        int stateArraySize = (capacity == -1) ? 1000 : capacity + 1;
+        this.stateTimes = new double[stateArraySize];
     }
 
-    public void setNextQueue(QueueSystem nextQueue) {
-        this.nextQueue = nextQueue;
+    public void setStationMap(Map<Integer, QueueSystem> stationMap) {
+        this.stationMap = stationMap;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public String getName() {
+        return name;
     }
 
     private int currentState() {
         int inService = busyServers.size();
         int inQueue = waitingLine.size();
         int state = inService + inQueue;
-        if (state > capacity) state = capacity;
+        if (capacity != -1 && state > capacity) state = capacity;
         return state;
     }
 
@@ -44,6 +59,7 @@ public class QueueSystem {
     }
 
     public boolean canAccept() {
+        if (capacity == -1) return true; // Infinite capacity
         return (waitingLine.size() + busyServers.size()) < capacity;
     }
 
@@ -73,6 +89,14 @@ public class QueueSystem {
         updateState(timeNow);
         busyServers.poll();
 
+        if (routingRules != null && !routingRules.isEmpty()) {
+            int destination = routeCustomer();
+            if (destination != -1 && stationMap != null && stationMap.containsKey(destination)) {
+                QueueSystem nextStation = stationMap.get(destination);
+                nextStation.addCustomer(new Customer(timeNow), timeNow, scheduler);
+            }
+        }
+
         if (!waitingLine.isEmpty()) {
             Customer next = waitingLine.poll();
             if (countingRandom.canDraw()) {
@@ -86,7 +110,26 @@ public class QueueSystem {
         }
     }
 
+    private int routeCustomer() {
+        if (!countingRandom.canDraw()) {
+            return -1; // Exit system if no random numbers available
+        }
+        
+        double random = countingRandom.nextDouble();
+        double cumulativeProbability = 0.0;
+        
+        for (RoutingRule rule : routingRules) {
+            cumulativeProbability += rule.getProbability();
+            if (random <= cumulativeProbability) {
+                return rule.getDestination();
+            }
+        }
+        
+        return -1; // Default to exit if no rule matches
+    }
+
     public void printStats(double currentTime) {
+        System.out.println("=== " + name + " (ID: " + id + ") ===");
         System.out.println("Clientes perdidos: " + lostCustomers);
         System.out.println("Tempos acumulados por estado:");
         for (int i = 0; i < stateTimes.length; i++) {
@@ -98,5 +141,6 @@ public class QueueSystem {
             double p = (currentTime > 0.0) ? (stateTimes[i] / currentTime) : 0.0;
             System.out.printf("Estado %d: %.6f\n", i, p);
         }
+        System.out.println();
     }
 }

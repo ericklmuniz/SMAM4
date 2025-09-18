@@ -1,0 +1,43 @@
+# Arquivos compilados Java
+*.class
+
+# Bloquear compilação automática
+javac
+*.jar
+*.war
+*.ear
+
+# Arquivos de IDE
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Arquivos temporários
+*.tmp
+*.temp
+*.cache
+
+# Arquivos de backup
+*.bak
+*.backup
+
+# Diretórios de build
+build/
+target/
+out/
+bin/
+
+# Arquivos de configuração local
+*.local
+.env

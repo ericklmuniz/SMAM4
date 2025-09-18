@@ -1,0 +1,42 @@
+===============================================================================
+                    SIMULADOR DE REDE DE FILAS - SMAM4
+===============================================================================
+
+INSTRUÇÕES DE EXECUÇÃO:
+
+1. COMPILAÇÃO:
+   - Abra o terminal no diretório do projeto
+   - Execute: javac *.java
+
+2. EXECUÇÃO:
+   - Execute: java NetworkSimulation network_config.yml
+   - OU use o script: ./run_simulation.sh (Linux/Mac)
+
+3. ARQUIVOS NECESSÁRIOS:
+   - Todos os arquivos .java devem estar no mesmo diretório
+   - network_config.yml deve estar no mesmo diretório
+   - run_simulation.sh (opcional, para Linux/Mac)
+
+4. RESULTADOS:
+   - A simulação será executada com 100.000 aleatórios
+   - Primeira chegada no tempo 2,0
+   - Resultados serão exibidos no terminal
+
+5. CONFIGURAÇÃO:
+   - Para modificar o modelo, edite network_config.yml
+   - Para usar configuração diferente: java NetworkSimulation arquivo.yml
+
+6. VALIDAÇÃO:
+   - A simulação implementa exatamente o modelo da atividade
+   - Estação 1 (G/G/1): 1 servidor, capacidade infinita
+   - Estação 2 (G/G/2/5): 2 servidores, capacidade 5
+   - Estação 3 (G/G/2/10): 2 servidores, capacidade 10
+   - Roteamento probabilístico conforme especificado
+
+7. RESULTADOS ESPERADOS:
+   - Tempo global da simulação
+   - Clientes perdidos por estação
+   - Distribuição de estados de cada estação
+   - Total de aleatórios utilizados: 100.000
+
+===============================================================================
