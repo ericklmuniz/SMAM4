@@ -11,6 +11,8 @@ public class NetworkSimulation {
     private int totalDepartures = 0;
     private Map<String, Integer> routingStats = new HashMap<>();
     private double lastArrivalTime = 0.0;
+    private String stopReason = "UNKNOWN";
+    private int eventCount = 0;
 
     public NetworkSimulation(String configFile) throws IOException {
         this.config = YamlConfigLoader.loadConfig(configFile);
@@ -72,6 +74,16 @@ public class NetworkSimulation {
         System.out.println("Filas iniciadas vazias conforme especificado");
         System.out.println();
 
+        // Configurar warm-up e T_max
+        Double timeMax = config.getTimeMax();
+        Double warmupFrac = config.getWarmupFrac();
+        double warmupStart = (timeMax != null && warmupFrac != null) ? timeMax * warmupFrac : 0.0;
+        
+        // Definir início da coleta para todas as estações
+        for (QueueSystem station : stations.values()) {
+            station.setCollectFrom(warmupStart);
+        }
+
         scheduler.add(new Event(config.getFirstArrivalTime(), EventType.ARRIVAL, 
                               stations.get(config.getDestinationStation()), 
                               new Customer(config.getFirstArrivalTime())));
@@ -79,6 +91,20 @@ public class NetworkSimulation {
         while (!scheduler.isEmpty() && countingRandom.canDraw()) {
             Event event = scheduler.poll();
             currentTime = event.time;
+            eventCount++;
+
+            // Verificar parada por T_max
+            if (timeMax != null && currentTime >= timeMax) {
+                stopReason = "T_MAX";
+                break;
+            }
+
+            // Logging periódico
+            if (config.getLogEvery() != null && eventCount % config.getLogEvery() == 0) {
+                System.out.printf("Event #%d: T=%.2f, Scheduler=%d, RNG=%d/%d%n", 
+                                eventCount, currentTime, scheduler.size(), 
+                                countingRandom.getUsed(), countingRandom.getMaxDraws());
+            }
 
             if (event.type == EventType.ARRIVAL) {
                 handleArrival(event);
@@ -87,11 +113,48 @@ public class NetworkSimulation {
             }
         }
 
+        // Determinar motivo da parada
+        if (scheduler.isEmpty()) {
+            stopReason = "SCHEDULER_EMPTY";
+        } else if (!countingRandom.canDraw()) {
+            stopReason = "RANDOMS_EXHAUSTED";
+        }
+
+        // Flush final do estado de todas as estações
         for (QueueSystem station : stations.values()) {
             station.updateState(currentTime);
         }
 
+        // Calcular Tobs (tempo de observação após warm-up)
+        double Tobs = Math.max(0, currentTime - warmupStart);
+        
+        // Exportar CSVs
+        exportCSVs(Tobs);
+        
+        // Imprimir resumo final
+        System.out.printf("STOP_REASON=%s; T=%.2f; Tobs=%.2f; RNG_USED=%d/%d%n", 
+                        stopReason, currentTime, Tobs, countingRandom.getUsed(), countingRandom.getMaxDraws());
+        
         printDetailedResults();
+    }
+
+    private void exportCSVs(double Tobs) {
+        try {
+            String runId = CsvUtils.generateRunId("network_config.yml");
+            String outputDir = config.getOutputDir();
+            
+            // Escrever arquivos CSV
+            CsvUtils.writeMetrics(outputDir, runId, stations, Tobs);
+            CsvUtils.writeStates(outputDir, runId, stations, Tobs);
+            CsvUtils.writeSummary(outputDir, runId, stations, Tobs, stopReason, 
+                                currentTime, (int)countingRandom.getUsed(), (int)countingRandom.getMaxDraws());
+            
+            System.out.println("CSVs exportados para: " + outputDir + "/" + runId);
+            
+        } catch (IOException e) {
+            System.err.println("Erro ao exportar CSVs: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     private void handleArrival(Event event) {

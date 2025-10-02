@@ -8,6 +8,12 @@ public class SimulationConfig {
     private double interArrivalMax;
     private int destinationStation;
     private List<StationConfig> stations;
+    
+    // Novos campos para T2
+    private Double timeMax;        // tempo máximo em minutos (opcional)
+    private Double warmupFrac;     // fração de warm-up 0-1 (opcional)
+    private String outputDir;      // diretório de saída (opcional)
+    private Integer logEvery;      // log a cada N eventos (opcional)
 
     public SimulationConfig() {}
 
@@ -65,5 +71,38 @@ public class SimulationConfig {
 
     public void setStations(List<StationConfig> stations) {
         this.stations = stations;
+    }
+
+    // Getters e setters para novos campos
+    public Double getTimeMax() {
+        return timeMax;
+    }
+
+    public void setTimeMax(Double timeMax) {
+        this.timeMax = timeMax;
+    }
+
+    public Double getWarmupFrac() {
+        return warmupFrac;
+    }
+
+    public void setWarmupFrac(Double warmupFrac) {
+        this.warmupFrac = warmupFrac;
+    }
+
+    public String getOutputDir() {
+        return outputDir != null ? outputDir : "out";  // default se ausente
+    }
+
+    public void setOutputDir(String outputDir) {
+        this.outputDir = outputDir;
+    }
+
+    public Integer getLogEvery() {
+        return logEvery;
+    }
+
+    public void setLogEvery(Integer logEvery) {
+        this.logEvery = logEvery;
     }
 }

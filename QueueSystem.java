@@ -15,6 +15,12 @@ public class QueueSystem {
     List<RoutingRule> routingRules;
     Map<Integer, QueueSystem> stationMap;
     CountingRandom countingRandom;
+    
+    // Novos campos para métricas T2
+    int arrivals = 0;
+    int departures = 0;
+    double busyTime = 0.0;
+    double collectFrom = 0.0;  // timestamp para início da coleta (warm-up)
 
     public QueueSystem(int id, String name, int servers, int capacity, double serviceMin, double serviceMax, 
                       List<RoutingRule> routingRules, CountingRandom countingRandom) {
@@ -51,9 +57,23 @@ public class QueueSystem {
         return state;
     }
 
+    public void setCollectFrom(double t) {
+        this.collectFrom = t;
+    }
+
     public void updateState(double timeNow) {
-        int state = currentState();
-        stateTimes[state] += timeNow - lastTime;
+        int inService = busyServers.size();
+        int inQueue = waitingLine.size();
+        int state = inService + inQueue;
+        if (capacity != -1 && state > capacity) state = capacity;
+
+        // Acumular apenas a partir do warm-up
+        double start = Math.max(lastTime, collectFrom);
+        if (timeNow > start) {
+            double dt = timeNow - start;
+            stateTimes[state] += dt;
+            busyTime += Math.min(servers, inService) * dt;
+        }
         lastTime = timeNow;
         this.currentTime = timeNow;
     }
@@ -65,6 +85,7 @@ public class QueueSystem {
 
     public void addCustomer(Customer customer, double timeNow, PriorityQueue<Event> scheduler) {
         updateState(timeNow);
+        arrivals++;  // Incrementar contador de chegadas
 
         if (!canAccept()) {
             lostCustomers++;
@@ -88,6 +109,7 @@ public class QueueSystem {
     public void finishService(double timeNow, PriorityQueue<Event> scheduler) {
         updateState(timeNow);
         busyServers.poll();
+        departures++;  // Incrementar contador de partidas
 
         if (routingRules != null && !routingRules.isEmpty()) {
             int destination = routeCustomer();
@@ -142,5 +164,44 @@ public class QueueSystem {
             System.out.printf("Estado %d: %.6f\n", i, p);
         }
         System.out.println();
+    }
+
+    // Classe para métricas da estação
+    public static class StationMetrics {
+        public int arrivals;
+        public int departures;
+        public int lost;
+        public double L;
+        public double Lq;
+        public double X;
+        public double R;
+        public double Wq;
+        public double rho;
+        public double Tobs;
+    }
+
+    public StationMetrics toMetrics(double Tobs) {
+        StationMetrics m = new StationMetrics();
+        m.arrivals = this.arrivals;
+        m.departures = this.departures;
+        m.lost = this.lostCustomers;
+        m.Tobs = Tobs;
+        
+        double L = 0.0, Lq = 0.0;
+        for (int n = 0; n < stateTimes.length; n++) {
+            double p = Tobs > 0 ? stateTimes[n] / Tobs : 0.0;
+            L += n * p;
+            Lq += Math.max(0, n - servers) * p;
+        }
+        
+        double X = Tobs > 0 ? (double) m.departures / Tobs : 0.0;
+        m.L = L; 
+        m.Lq = Lq; 
+        m.X = X;
+        m.R = X > 0 ? L / X : 0.0;
+        m.Wq = X > 0 ? Lq / X : 0.0;
+        m.rho = (servers > 0 && Tobs > 0) ? (busyTime / (servers * Tobs)) : 0.0;
+        
+        return m;
     }
 }

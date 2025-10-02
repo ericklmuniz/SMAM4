@@ -1,0 +1,52 @@
+simulation:
+  max_random_draws: 100000
+  first_arrival_time: 2.0
+  random_seed: 42
+  output_dir: "out"
+  time_max: 8000
+  warmup_frac: 0.15
+  log_every: 5000
+
+arrivals:
+  inter_arrival_min: 2.0
+  inter_arrival_max: 4.0
+  destination_station: 1
+
+stations:
+  - id: 1
+    name: "S1 Triagem"
+    servers: 2
+    capacity: -1
+    service_time_min: 1.0
+    service_time_max: 2.0
+    routing:
+      - destination: 2
+        probability: 0.85
+      - destination: 3
+        probability: 0.15
+
+  - id: 2
+    name: "S2 Consultórios"
+    servers: 3
+    capacity: 8
+    service_time_min: 4.0
+    service_time_max: 6.0
+    routing:
+      - destination: 1
+        probability: 0.10
+      - destination: 3
+        probability: 0.60
+      - destination: -1
+        probability: 0.30
+
+  - id: 3
+    name: "S3 Laboratório"
+    servers: 2
+    capacity: 10
+    service_time_min: 5.0
+    service_time_max: 15.0
+    routing:
+      - destination: 2
+        probability: 0.70
+      - destination: -1
+        probability: 0.30

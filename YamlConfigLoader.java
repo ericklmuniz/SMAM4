@@ -64,6 +64,10 @@ public class YamlConfigLoader {
         }
         
         config.setStations(stations);
+        
+        // Validar roteamento de cada estação
+        validateRouting(stations);
+        
         return config;
     }
     
@@ -74,6 +78,14 @@ public class YamlConfigLoader {
             config.setFirstArrivalTime(extractDouble(line));
         } else if (line.contains("random_seed:")) {
             config.setRandomSeed(extractLong(line));
+        } else if (line.contains("time_max:")) {
+            config.setTimeMax(extractDouble(line));
+        } else if (line.contains("warmup_frac:")) {
+            config.setWarmupFrac(extractDouble(line));
+        } else if (line.contains("output_dir:")) {
+            config.setOutputDir(extractString(line));
+        } else if (line.contains("log_every:")) {
+            config.setLogEvery(extractInt(line));
         }
     }
     
@@ -147,5 +159,28 @@ public class YamlConfigLoader {
             return matcher.group(1);
         }
         return "";
+    }
+    
+    private static void validateRouting(List<StationConfig> stations) {
+        for (StationConfig station : stations) {
+            List<RoutingRule> routing = station.getRouting();
+            if (routing != null && !routing.isEmpty()) {
+                double sum = 0.0;
+                for (RoutingRule rule : routing) {
+                    sum += rule.getProbability();
+                }
+                
+                // Verificar se soma está próxima de 1.0 (tolerância 1e-6)
+                if (Math.abs(sum - 1.0) > 1e-6) {
+                    System.err.printf("Routing normalized at station %s: sum=%.6f\n", 
+                                    station.getName(), sum);
+                    
+                    // Normalizar probabilidades
+                    for (RoutingRule rule : routing) {
+                        rule.setProbability(rule.getProbability() / sum);
+                    }
+                }
+            }
+        }
     }
 }
